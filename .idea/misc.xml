@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="MavenProjectsManager">
+    <option name="originalFiles">
+      <list>
+        <option value="$PROJECT_DIR$/ApiGateway/pom.xml" />
+        <option value="$PROJECT_DIR$/authService/pom.xml" />
+        <option value="$PROJECT_DIR$/QuizService/pom.xml" />
+        <option value="$PROJECT_DIR$/ReportService/pom.xml" />
+        <option value="$PROJECT_DIR$/ResultService/pom.xml" />
+        <option value="$PROJECT_DIR$/QuestionService/pom.xml" />
+        <option value="$PROJECT_DIR$/ServiceRegistry/pom.xml" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_25" default="true" project-jdk-name="openjdk-25" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
+</project>
