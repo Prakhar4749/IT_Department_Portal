@@ -120,7 +120,6 @@ Since the project is currently in the infrastructure phase, running the project 
 ## 👥 Authors
 
 * **Prakhar Sakhare**
-* **Gavesh Gatham**
 * **Mentor:** Dr. Mahesh Pawar
 
 ---
