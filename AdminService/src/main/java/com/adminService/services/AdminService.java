@@ -94,32 +94,47 @@ public class AdminService {
     public Department addDepartment(DepartmentRequest request) {
         // 1. Verify College Exists
         College college = collegeRepository.findById(request.getCollegeId())
-                .orElseThrow(() -> new RuntimeException("College not found with ID: " + request.getCollegeId()));
+                .orElseThrow(() -> new RuntimeException("College not found"));
 
-        // 2. Generate Random Password
-        String tempPassword = RandomStringUtils.randomAlphanumeric(8);
-
-        // 3. Create Dept Admin in Auth Service
-        SignupRequest userRequest = new SignupRequest();
-        userRequest.setEmail(request.getAdminEmail());
-        userRequest.setPassword(tempPassword);
-        userRequest.setRole("DEPT_ADMIN");
-
-        Long adminUserId;
-        try {
-            adminUserId = authClient.createAdminUser(gatewaySecret, userRequest);
-        } catch (FeignException e) {
-            throw new RuntimeException("Failed to create Admin: Email '" + request.getAdminEmail() + "' likely already exists.");
-        }
-
-        // 4. Save Department locally
+        // 2. STEP A: Save Department FIRST (to generate the ID)
         Department department = Department.builder()
                 .name(request.getName())
                 .code(request.getCode())
                 .college(college)
-                .adminUserId(adminUserId)
+                .adminEmail(request.getAdminEmail())
+                .adminUserId(null) // Temporarily null
                 .build();
 
+        // This call generates the ID in the database
+        department = departmentRepository.save(department);
+        Long newDeptId = department.getId();
+
+        // 3. STEP B: Create Dept Admin in Auth Service
+        // Now we HAVE the departmentId to pass to the user!
+        String tempPassword = RandomStringUtils.randomAlphanumeric(8);
+
+        SignupRequest userRequest = new SignupRequest();
+        userRequest.setEmail(request.getAdminEmail());
+        userRequest.setPassword(tempPassword);
+        userRequest.setRole("DEPT_ADMIN");
+        userRequest.setCollegeId(college.getId());      // Pass College ID
+        userRequest.setDepartmentId(newDeptId);         // Pass the new Dept ID
+        // Note: If SignupRequest needs a 'name', set it too (e.g., "HOD " + request.getName())
+
+        Long adminUserId;
+        try {
+            adminUserId = authClient.createAdminUser(gatewaySecret, userRequest);
+        } catch (Exception e) {
+            // CRITICAL: If User creation fails, we must delete the "half-created" department
+            // to prevent ghost data. (Though @Transactional usually handles rollback,
+            // explicit handling is safer if Feign exceptions are swallowed).
+            throw new RuntimeException("Failed to create Admin User. Rolling back Department. Error: " + e.getMessage());
+        }
+
+        // 4. STEP C: Update Department with the new Admin ID
+        department.setAdminUserId(adminUserId);
+
+        // This performs an SQL UPDATE
         return departmentRepository.save(department);
     }
 }

@@ -2,9 +2,15 @@ package com.adminService.controllers;
 
 import com.adminService.DTO.CollegeRequest;
 import com.adminService.DTO.DepartmentRequest;
+import com.adminService.DTO.HodResponse;
 import com.adminService.entities.College;
 import com.adminService.entities.Department;
+import com.adminService.repositories.DepartmentRepository;
 import com.adminService.services.AdminService;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +23,7 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
+    private final DepartmentRepository departmentRepository;
 
     // --- ADD OPERATIONS (Protected) ---
 
@@ -54,4 +61,15 @@ public class AdminController {
     public ResponseEntity<List<Department>> getDepartmentsByCollege(@PathVariable Long collegeId) {
         return ResponseEntity.ok(adminService.getDepartmentsByCollege(collegeId));
     }
+
+    @GetMapping("/internal/departments/{id}/hod")
+    public ResponseEntity<HodResponse> getHodDetails(@PathVariable Long id) {
+        Department dept = departmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Department not found"));
+
+        return ResponseEntity.ok(new HodResponse(dept.getAdminUserId(), dept.getAdminEmail()));
+    }
+
+
+
 }

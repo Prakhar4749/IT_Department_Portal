@@ -14,15 +14,19 @@ public class Department {
     private Long id;
 
     @Column(nullable = false)
-    private String name; // e.g., "Computer Science"
+    private String name;
 
-    private String code; // e.g., "CSE"
+    private String code;
 
     @ManyToOne
     @JoinColumn(name = "college_id", nullable = false)
     private College college;
 
-    // ID of the DEPT_ADMIN user in Auth Service
-    @Column(nullable = false)
+    // Existing: The ID of the user in Auth Service
+    @Column(name = "admin_user_id")
     private Long adminUserId;
+
+    // NEW FIELD: Store the email here so Kafka Connect can pick it up!
+    @Column(nullable = false)
+    private String adminEmail;
 }
