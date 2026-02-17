@@ -23,7 +23,7 @@ public class EmailService {
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
-    public void sendEmail(NotificationEvent event, String subject, String content) {
+    public void sendEmail(String targetEmail, String subject, String content) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("api-key", apiKey);
@@ -34,12 +34,12 @@ public class EmailService {
             // Sender
             Map<String, String> sender = new HashMap<>();
             sender.put("name", "University Platform");
-            sender.put("email", "no-reply@university.com");
+            sender.put("email", "prakharbhawsar2712@gmail.com");
             body.put("sender", sender);
 
             // Receiver
             Map<String, String> to = new HashMap<>();
-            to.put("email", event.getTargetEmail());
+            to.put("email", targetEmail);
             body.put("to", List.of(to));
 
             // Content
@@ -50,7 +50,7 @@ public class EmailService {
 
             // Send
             restTemplate.postForEntity(BREVO_URL, request, String.class);
-            log.info("📧 Email sent to {}", event.getTargetEmail());
+            log.info("📧 Email sent to {}", targetEmail);
 
         } catch (Exception e) {
             log.error("❌ Failed to send email: {}", e.getMessage());
