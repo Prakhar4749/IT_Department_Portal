@@ -4,8 +4,9 @@ import com.authService.DTO.*;
 import com.authService.entities.User;
 import com.authService.enums.AccountStatus;
 import com.authService.services.AuthService;
-import com.authService.services.OtpService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,61 +16,65 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final OtpService otpService;
 
     // 1. Generate OTP
     @PostMapping("/send-otp")
-    public ResponseEntity<String> sendOtp(@RequestParam String email) {
+    public ResponseEntity<ApiResponse<Void>> sendOtp(@RequestParam String email) {
         authService.verifyEmail(email);
-        return ResponseEntity.ok("OTP sent successfully to " + email);
+        return ResponseEntity.ok(ApiResponse.success(null, "OTP sent successfully to " + email));
     }
 
     // 2. Signup (Requires OTP in request body)
     @PostMapping("/signup")
-    public ResponseEntity<String> signup(@RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<Void>> signup(@Valid @RequestBody SignupRequest request) {
         authService.registerUser(request);
-        return ResponseEntity.ok("User verified and registered. Waiting for Department Approval.");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(null, "User verified and registered. Waiting for Department Approval."));
     }
 
     // Public: Login
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
+        AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Login successful."));
     }
 
     // 3. Forgot Password (Step 1)
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(@RequestParam String email) {
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@RequestParam String email) {
         authService.forgotPassword(email);
-        return ResponseEntity.ok("OTP sent to your email for password reset.");
+        return ResponseEntity.ok(ApiResponse.success(null, "OTP sent to your email for password reset."));
     }
 
     // 4. Reset Password (Step 2)
     @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         String result = authService.resetPassword(
                 request.getEmail(),
                 request.getOtp(),
                 request.getNewPassword()
         );
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(ApiResponse.success(null, result));
     }
+
     @PostMapping("/change-password")
-    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request) {
+    public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         authService.changePassword(request.getEmail(), request.getOldPassword(), request.getNewPassword());
-        return ResponseEntity.ok("Password changed successfully.");
+        return ResponseEntity.ok(ApiResponse.success(null, "Password changed successfully."));
     }
 
     // INTERNAL: Called by Approval Service via OpenFeign
     @PutMapping("/internal/update-status")
-    public ResponseEntity<String> updateStatus(@RequestParam String email, @RequestParam AccountStatus status) {
+    public ResponseEntity<ApiResponse<Void>> updateStatus(@RequestParam String email, @RequestParam AccountStatus status) {
         authService.updateUserStatus(email, status);
-        return ResponseEntity.ok("Status updated to " + status);
+        return ResponseEntity.ok(ApiResponse.success(null, "Status updated to " + status));
     }
+
     // Internal Endpoint: Protected by Gateway Secret
     @PostMapping("/internal/create-admin")
-    public ResponseEntity<Long> createAdmin(@RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<Long>> createAdmin(@Valid @RequestBody SignupRequest request) {
         User user = authService.createAdminUser(request);
-        return ResponseEntity.ok(user.getId()); // Return ID to Admin Service
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(user.getId(), "Admin user created successfully."));
     }
 }
