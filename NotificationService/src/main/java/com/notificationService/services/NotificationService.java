@@ -1,7 +1,7 @@
 package com.notificationService.services;
 
 import com.notificationService.entities.Notification;
-
+import com.notificationService.exceptions.ResourceNotFoundException;
 import com.notificationService.repositopries.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,12 +22,12 @@ public class NotificationService {
 
     public void markAsRead(Long notificationId) {
         Notification n = repository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found with ID: " + notificationId));
         n.setRead(true);
         repository.save(n);
     }
 
     public void markAllAsRead(Long userId) {
-        repository.markAllAsRead(userId); // Custom Query in Repo
+        repository.markAllAsRead(userId);
     }
 }

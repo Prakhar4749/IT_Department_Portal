@@ -1,14 +1,15 @@
 package com.notificationService.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.notificationService.DTO.ApiResponse;
 import com.notificationService.DTO.HodDetailsResponse;
 import com.notificationService.DTO.NotificationEvent;
 import com.notificationService.clients.AdminClient;
-import com.notificationService.entities.Notification;
 
+import com.notificationService.entities.Notification;
 import com.notificationService.repositopries.NotificationRepository;
 import com.notificationService.services.EmailService;
-
+import com.notificationService.utils.EmailTemplateBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -25,143 +26,93 @@ public class NotificationConsumer {
     private final EmailService emailService;
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final AdminClient adminClient;
-
-
-
     private final NotificationRepository repository;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = {"notification.otp","notification.user", "notification.system"}, groupId = "notification-group")
+    @KafkaListener(topics = {"notification.otp", "notification.user", "notification.system"}, groupId = "notification-group")
     public void consume(String message) {
         try {
             NotificationEvent event = objectMapper.readValue(message, NotificationEvent.class);
-            log.info("Consumed Event: {} | Type: {}", event.getEventId(), event.getEventType());
+            log.info("📥 Consumed Event: {} | Type: {}", event.getEventId(), event.getEventType());
 
-            // --- ROUTING LOGIC ---
             switch (event.getEventType()) {
-                // --- DISTINCT OTP HANDLING ---
-                case "OTP_EMAIL_VERIFICATION":
-                    sendOtpEmail(event, "Verify Your Email", "Welcome! Your signup verification code is:");
-                    break;
-
-                case "OTP_PASSWORD_RESET":
-                    sendOtpEmail(event, "Reset Password Request", "Security Alert: Your password reset code is:");
-                    break;
-
-                // --- DUAL NOTIFICATION HANDLING ---
-                case "USER_REGISTERED":
-                    handleDualRegistrationNotification(event);
-                    break;
-                case "ACCOUNT_APPROVED":
-                    handleAccountApproved(event);
-                    break;
-                case "PASSWORD_RESET":
-                    handlePasswordReset(event);
-                    break;
-                default:
-                    log.warn("Unknown event type: {}", event.getEventType());
+                case "OTP_EMAIL_VERIFICATION" -> sendOtpEmail(event, "Verify Your Email", "Welcome! Your signup verification code is:");
+                case "OTP_PASSWORD_RESET" -> sendOtpEmail(event, "Reset Password Request", "Security Alert: Your password reset code is:");
+                case "USER_REGISTERED" -> handleDualRegistrationNotification(event);
+                case "ACCOUNT_APPROVED" -> handleAccountApproved(event);
+                case "PASSWORD_CHANGED" -> handlePasswordReset(event);
+                default -> log.warn("⚠️ Unknown event type: {}", event.getEventType());
             }
         } catch (Exception e) {
-            log.error("Error processing notification: {}", e.getMessage());
+            // In a production system, you would send this message to a Dead Letter Topic (DLT) here
+            log.error("❌ Error processing notification: {}", e.getMessage(), e);
         }
     }
 
-    // --- HANDLERS ---
+// ... inside NotificationConsumer.java ...
 
-    // Helper for OTPs
     private void sendOtpEmail(NotificationEvent event, String subject, String prefix) {
         String otp = (String) event.getPayload().get("otp");
-        String html = String.format("<h3>%s</h3><h1>%s</h1>", prefix, otp);
-
-        // We temporarily set targetEmail on event if it's missing (though Producer sets it for OTPs)
+        // USE THE BUILDER
+        String html = EmailTemplateBuilder.buildOtpEmail(subject, prefix, otp);
         emailService.sendEmail(event.getTargetEmail(), subject, html);
     }
 
-    // Helper for Dual Notification
     private void handleDualRegistrationNotification(NotificationEvent event) {
         Map<String, Object> payload = event.getPayload();
         String userEmail = (String) payload.get("userEmail");
-        String userName = (String) payload.get("enrollmentNo");
+        String enrollmentNo = (String) payload.get("enrollmentNo");
 
-        // 1. Send Email to the USER (Student)
-        String userHtml = "<h1>Registration Successful</h1><p>Hi " + userName + ", your account is pending approval.</p>";
-        emailService.sendEmail(userEmail, "Welcome to the Platform", userHtml);
-        log.info("✅ Sent Welcome Email to User: {}", userEmail);
+        // 1. Send Email to the Student (USE BUILDER)
+        String userHtml = EmailTemplateBuilder.buildWelcomePendingEmail(enrollmentNo);
+        emailService.sendEmail(userEmail, "Registration Successful - Pending Approval", userHtml);
 
         // 2. Notify HOD
         try {
-            Object deptObj = payload.get("departmentId");
-            log.info("departmentId raw value: {}", deptObj);
-            log.info("departmentId class: {}", deptObj != null ? deptObj.getClass() : "null");
-
             Long deptId = Long.valueOf(payload.get("departmentId").toString());
-
-            // CALL ADMIN SERVICE VIA FEIGN (Easy & Reliable)
-            log.info("Calling Admin Service for deptId: {}", deptId);
-
-            HodDetailsResponse hod = adminClient.getHodDetails(deptId);
-
-            log.info("HOD response: {}", hod);
+            ApiResponse<HodDetailsResponse> response = adminClient.getHodDetails(deptId);
+            HodDetailsResponse hod = response.getData();
 
             if (hod != null && hod.getEmail() != null) {
-                // A. Send Email
-                String msg = "New student waiting for approval.";
-                emailService.sendEmail(hod.getEmail(), "Approval Request", msg);
+                // USE BUILDER for HOD
+                String hodHtml = EmailTemplateBuilder.buildHodActionRequiredEmail(userEmail, enrollmentNo);
+                emailService.sendEmail(hod.getEmail(), "Action Required: New Student Registration", hodHtml);
 
-                // B. Send Real-time Notification
-                // Create a temporary event targeting the HOD's ID
                 NotificationEvent hodEvent = NotificationEvent.builder()
-                        .targetUserId(hod.getUserId()) // <--- Now we have the ID!
+                        .targetUserId(hod.getUserId())
                         .payload(payload)
                         .build();
 
-                saveAndSendInApp(hodEvent, "New Student", msg, "INFO");
+                saveAndSendInApp(hodEvent, "New Student Approval Required", "Student " + enrollmentNo + " is waiting for approval.", "INFO");
             }
         } catch (Exception e) {
             log.error("❌ Failed to fetch HOD details or send notification: {}", e.getMessage());
         }
     }
 
-
-    private void handleApprovalRequest(NotificationEvent event) {
-        // Rule: EMAIL + IN_APP (For Admin/HOD)
-        String userEmail = (String) event.getPayload().get("userEmail");
-        String message = "New user registration: " + userEmail + ". Needs approval.";
-
-        // 1. Send Email
-        emailService.sendEmail(event.getTargetEmail(), "Action Required: New Registration", "<p>" + message + "</p>");
-
-        // 2. Save In-App Notification
-        saveAndSendInApp(event, "New Registration", message, "INFO");
-    }
-
     private void handleAccountApproved(NotificationEvent event) {
-        // Rule: EMAIL + IN_APP (For Student)
-        String msg = "Congratulations! Your account has been approved.";
-        emailService.sendEmail(event.getTargetEmail(), "Welcome to University Platform", "<p>" + msg + "</p>");
-        saveAndSendInApp(event, "Account Approved", msg, "SUCCESS");
+        // USE BUILDER
+        String html = EmailTemplateBuilder.buildAccountApprovedEmail();
+        emailService.sendEmail(event.getTargetEmail(), "Welcome to the University Platform", html);
+        saveAndSendInApp(event, "Account Approved", "Congratulations! Your account has been approved.", "SUCCESS");
     }
 
     private void handlePasswordReset(NotificationEvent event) {
-        // Rule: EMAIL ONLY (Security)
-        emailService.sendEmail(event.getTargetEmail(), "Security Alert", "<p>Your password was just changed.</p>");
+        // USE BUILDER
+        String html = EmailTemplateBuilder.buildSecurityAlertEmail();
+        emailService.sendEmail(event.getTargetEmail(), "Security Alert: Password Changed", html);
     }
 
-
     private void saveAndSendInApp(NotificationEvent event, String title, String message, String type) {
-        // 1. Persist
         Notification n = Notification.builder()
                 .userId(event.getTargetUserId())
                 .title(title)
                 .message(message)
-                //.type(NotificationType.valueOf(type))
                 .isRead(false)
                 .metadata(event.getPayload().toString())
                 .build();
 
         repository.save(n);
-
-        // 2. Real-time Push (Topic: /topic/notifications/{userId})
         simpMessagingTemplate.convertAndSend("/topic/notifications/" + event.getTargetUserId(), n);
     }
 }

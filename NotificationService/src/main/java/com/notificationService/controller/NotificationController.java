@@ -1,7 +1,9 @@
 package com.notificationService.controller;
 
+
+import com.notificationService.DTO.ApiResponse;
 import com.notificationService.entities.Notification;
-import com.notificationService.services.NotificationService; // We will create this below
+import com.notificationService.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,25 +17,24 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    // 1. Fetch unread or all notifications for the logged-in user
     @GetMapping
-    public ResponseEntity<List<Notification>> getUserNotifications(
-            @RequestHeader("loggedInUserId") Long userId, // From Gateway
+    public ResponseEntity<ApiResponse<List<Notification>>> getUserNotifications(
+            @RequestHeader("loggedInUserId") Long userId,
             @RequestParam(defaultValue = "false") boolean unreadOnly) {
-        return ResponseEntity.ok(notificationService.getUserNotifications(userId, unreadOnly));
+
+        List<Notification> notifications = notificationService.getUserNotifications(userId, unreadOnly);
+        return ResponseEntity.ok(ApiResponse.success(notifications, "Notifications fetched successfully."));
     }
 
-    // 2. Mark a specific notification as read
     @PatchMapping("/{id}/read")
-    public ResponseEntity<Void> markAsRead(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable Long id) {
         notificationService.markAsRead(id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success(null, "Notification marked as read."));
     }
 
-    // 3. Mark ALL as read
     @PatchMapping("/read-all")
-    public ResponseEntity<Void> markAllAsRead(@RequestHeader("loggedInUserId") Long userId) {
+    public ResponseEntity<ApiResponse<Void>> markAllAsRead(@RequestHeader("loggedInUserId") Long userId) {
         notificationService.markAllAsRead(userId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success(null, "All notifications marked as read."));
     }
 }
