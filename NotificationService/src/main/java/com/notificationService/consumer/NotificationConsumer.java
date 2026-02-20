@@ -90,10 +90,18 @@ public class NotificationConsumer {
 
         // 2. Notify HOD
         try {
-            Long deptId = ((Number) payload.get("departmentId")).longValue();
+            Object deptObj = payload.get("departmentId");
+            log.info("departmentId raw value: {}", deptObj);
+            log.info("departmentId class: {}", deptObj != null ? deptObj.getClass() : "null");
+
+            Long deptId = Long.valueOf(payload.get("departmentId").toString());
 
             // CALL ADMIN SERVICE VIA FEIGN (Easy & Reliable)
+            log.info("Calling Admin Service for deptId: {}", deptId);
+
             HodDetailsResponse hod = adminClient.getHodDetails(deptId);
+
+            log.info("HOD response: {}", hod);
 
             if (hod != null && hod.getEmail() != null) {
                 // A. Send Email
