@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>prakhar.departmental-portal</groupId>
-	<artifactId>authService</artifactId>
+	<artifactId>AuthService</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>authService</name>
 	<description>This is Authentication Service </description>
