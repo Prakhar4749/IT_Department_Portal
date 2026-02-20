@@ -1,17 +1,21 @@
 package com.adminService.controllers;
 
+import com.adminService.DTO.ApiResponse;
 import com.adminService.DTO.CollegeRequest;
 import com.adminService.DTO.DepartmentRequest;
 import com.adminService.DTO.HodResponse;
+
 import com.adminService.entities.College;
 import com.adminService.entities.Department;
+import com.adminService.exceptions.ResourceNotFoundException;
+
+import com.adminService.exceptions.UnauthorizedAccessException;
 import com.adminService.repositories.DepartmentRepository;
 import com.adminService.services.AdminService;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Data;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,48 +32,53 @@ public class AdminController {
     // --- ADD OPERATIONS (Protected) ---
 
     @PostMapping("/add-college")
-    public ResponseEntity<?> addCollege(
-            @RequestHeader("loggedInUserRole") String role, // Passed by Gateway
-            @RequestBody CollegeRequest request) {
+    public ResponseEntity<ApiResponse<College>> addCollege(
+            @RequestHeader("loggedInUserRole") String role,
+            @Valid @RequestBody CollegeRequest request) {
 
         if (!"SUPER_ADMIN".equals(role)) {
-            return ResponseEntity.status(403).body("Access Denied: Only SUPER_ADMIN can add colleges.");
+            throw new UnauthorizedAccessException("Access Denied: Only SUPER_ADMIN can add colleges.");
         }
-        return ResponseEntity.ok(adminService.addCollege(request));
+
+        College createdCollege = adminService.addCollege(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(createdCollege, "College added successfully."));
     }
 
     @PostMapping("/add-department")
-    public ResponseEntity<?> addDepartment(
+    public ResponseEntity<ApiResponse<Department>> addDepartment(
             @RequestHeader("loggedInUserRole") String role,
-            @RequestBody DepartmentRequest request) {
+            @Valid @RequestBody DepartmentRequest request) {
 
-        // Allow SUPER_ADMIN or COLLEGE_ADMIN
         if (!"SUPER_ADMIN".equals(role) && !"COLLEGE_ADMIN".equals(role)) {
-            return ResponseEntity.status(403).body("Access Denied.");
+            throw new UnauthorizedAccessException("Access Denied: Insufficient permissions to add a department.");
         }
-        return ResponseEntity.ok(adminService.addDepartment(request));
+
+        Department createdDepartment = adminService.addDepartment(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(createdDepartment, "Department added successfully."));
     }
 
     // --- GET OPERATIONS (For Frontend Dropdowns) ---
 
     @GetMapping("/colleges")
-    public ResponseEntity<List<College>> getAllColleges() {
-        return ResponseEntity.ok(adminService.getAllColleges());
+    public ResponseEntity<ApiResponse<List<College>>> getAllColleges() {
+        List<College> colleges = adminService.getAllColleges();
+        return ResponseEntity.ok(ApiResponse.success(colleges, "Colleges fetched successfully."));
     }
 
     @GetMapping("/departments/{collegeId}")
-    public ResponseEntity<List<Department>> getDepartmentsByCollege(@PathVariable Long collegeId) {
-        return ResponseEntity.ok(adminService.getDepartmentsByCollege(collegeId));
+    public ResponseEntity<ApiResponse<List<Department>>> getDepartmentsByCollege(@PathVariable Long collegeId) {
+        List<Department> departments = adminService.getDepartmentsByCollege(collegeId);
+        return ResponseEntity.ok(ApiResponse.success(departments, "Departments fetched successfully."));
     }
 
     @GetMapping("/departments/{id}/hod")
-    public ResponseEntity<HodResponse> getHodDetails(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<HodResponse>> getHodDetails(@PathVariable Long id) {
         Department dept = departmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found with ID: " + id));
 
-        return ResponseEntity.ok(new HodResponse(dept.getAdminUserId(), dept.getAdminEmail()));
+        HodResponse response = new HodResponse(dept.getAdminUserId(), dept.getAdminEmail());
+        return ResponseEntity.ok(ApiResponse.success(response, "HOD details fetched successfully."));
     }
-
-
-
 }
