@@ -139,6 +139,7 @@ public class AuthService {
                 });
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangeRequired(false);
         userRepository.save(user);
         log.info("Password reset successfully for email: {}", email);
 
