@@ -16,6 +16,7 @@ public class RouteValidator {
             "/auth/forgot-password",
             "/auth/reset-password",
             "/auth/*",
+            "/admin/public",
             "/eureka",
             "/ws-notifications",
             "notification/ws-notifications",

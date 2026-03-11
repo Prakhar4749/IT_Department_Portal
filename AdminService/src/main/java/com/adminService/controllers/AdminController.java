@@ -59,19 +59,7 @@ public class AdminController {
                 .body(ApiResponse.success(createdDepartment, "Department added successfully."));
     }
 
-    // --- GET OPERATIONS (For Frontend Dropdowns) ---
-
-    @GetMapping("/colleges")
-    public ResponseEntity<ApiResponse<List<College>>> getAllColleges() {
-        List<College> colleges = adminService.getAllColleges();
-        return ResponseEntity.ok(ApiResponse.success(colleges, "Colleges fetched successfully."));
-    }
-
-    @GetMapping("/departments/{collegeId}")
-    public ResponseEntity<ApiResponse<List<Department>>> getDepartmentsByCollege(@PathVariable Long collegeId) {
-        List<Department> departments = adminService.getDepartmentsByCollege(collegeId);
-        return ResponseEntity.ok(ApiResponse.success(departments, "Departments fetched successfully."));
-    }
+    // --- GET OPERATIONS (Protected) ---
 
     @GetMapping("/departments/{id}/hod")
     public ResponseEntity<ApiResponse<HodResponse>> getHodDetails(@PathVariable Long id) {
